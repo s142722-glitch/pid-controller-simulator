@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PID Controller Simulator</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+<style>
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --surface2: #334155;
+    --border: #475569; --text: #f1f5f9; --text2: #94a3b8;
+    --accent: #3b82f6; --accent2: #8b5cf6; --green: #22c55e;
+    --orange: #f59e0b; --red: #ef4444; --cyan: #06b6d4;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .header { background: linear-gradient(135deg, #1e3a5f, #2d1b69); padding: 24px 32px; border-bottom: 1px solid var(--border); }
+  .header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+  .header p { color: var(--text2); margin-top: 4px; font-size: 14px; }
+
+  .layout { display: grid; grid-template-columns: 340px 1fr; gap: 0; min-height: calc(100vh - 85px); }
+
+  .sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 20px; overflow-y: auto; max-height: calc(100vh - 85px); }
+  .main { padding: 20px; overflow-y: auto; max-height: calc(100vh - 85px); }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .card-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .card-title::before { content: ''; width: 3px; height: 16px; background: var(--accent); border-radius: 2px; }
+
+  .sidebar .card { background: var(--surface2); border-color: transparent; }
+
+  .form-group { margin-bottom: 14px; }
+  .form-label { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--text2); margin-bottom: 6px; }
+  .form-value { font-weight: 600; color: var(--text); font-family: 'Consolas', monospace; }
+
+  input[type="range"] {
+    -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px;
+    background: var(--surface); outline: none; cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--accent); cursor: pointer; border: 2px solid var(--bg);
+    box-shadow: 0 0 8px rgba(59,130,246,0.4);
+  }
+  input[type="range"].green-thumb::-webkit-slider-thumb { background: var(--green); box-shadow: 0 0 8px rgba(34,197,94,0.4); }
+  input[type="range"].orange-thumb::-webkit-slider-thumb { background: var(--orange); box-shadow: 0 0 8px rgba(245,158,11,0.4); }
+  input[type="range"].red-thumb::-webkit-slider-thumb { background: var(--red); box-shadow: 0 0 8px rgba(239,68,68,0.4); }
+  input[type="range"].cyan-thumb::-webkit-slider-thumb { background: var(--cyan); box-shadow: 0 0 8px rgba(6,182,212,0.4); }
+  input[type="range"].purple-thumb::-webkit-slider-thumb { background: var(--accent2); box-shadow: 0 0 8px rgba(139,92,246,0.4); }
+
+  .btn-group { display: flex; gap: 4px; background: var(--surface); border-radius: 8px; padding: 3px; margin-bottom: 14px; }
+  .btn-group button {
+    flex: 1; padding: 8px 12px; border: none; border-radius: 6px; font-size: 13px;
+    font-weight: 500; cursor: pointer; transition: all 0.2s; background: transparent; color: var(--text2);
+  }
+  .btn-group button.active { background: var(--accent); color: white; }
+  .btn-group button:hover:not(.active) { color: var(--text); }
+
+  .auto-tune-btn {
+    width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 14px;
+    font-weight: 600; cursor: pointer; transition: all 0.2s;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    color: white; letter-spacing: 0.5px;
+  }
+  .auto-tune-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(139,92,246,0.4); }
+  .auto-tune-btn:active { transform: translateY(0); }
+
+  .metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .metric-card {
+    background: var(--surface2); border-radius: 10px; padding: 16px; text-align: center;
+    border: 1px solid transparent; transition: border-color 0.2s;
+  }
+  .metric-card:hover { border-color: var(--border); }
+  .metric-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); margin-bottom: 6px; }
+  .metric-value { font-size: 22px; font-weight: 700; font-family: 'Consolas', monospace; }
+  .metric-unit { font-size: 12px; color: var(--text2); margin-left: 2px; }
+  .mv-blue { color: var(--accent); }
+  .mv-green { color: var(--green); }
+  .mv-orange { color: var(--orange); }
+  .mv-red { color: var(--red); }
+  .mv-cyan { color: var(--cyan); }
+
+  .transfer-fn {
+    background: var(--bg); border-radius: 8px; padding: 14px; text-align: center;
+    font-family: 'Consolas', monospace; font-size: 15px; margin-bottom: 14px;
+    border: 1px solid var(--border);
+  }
+  .tf-frac { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; }
+  .tf-num { border-bottom: 2px solid var(--text2); padding-bottom: 4px; margin-bottom: 4px; }
+
+  .chart-wrapper { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+
+  .eq-label { color: var(--accent); font-weight: 600; }
+
+  .separator { height: 1px; background: var(--border); margin: 16px 0; opacity: 0.5; }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { max-height: none; border-right: none; border-bottom: 1px solid var(--border); }
+    .main { max-height: none; }
+    .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo, useCallback } = React;
+const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } = Recharts;
+
+/* ───── Simulation Engine ───── */
+function simulate(plant, pid, setpoint = 1.0, duration = 15, dt = 0.01) {
+  const steps = Math.floor(duration / dt);
+  const data = [];
+  let y = 0, integral = 0, prevError = 0;
+  // Plant state
+  let x1 = 0, x2 = 0; // state variables
+
+  for (let i = 0; i <= steps; i++) {
+    const t = i * dt;
+    const error = setpoint - y;
+    integral += error * dt;
+    // Anti-windup clamp
+    integral = Math.max(-50, Math.min(50, integral));
+    const derivative = i === 0 ? 0 : (error - prevError) / dt;
+    const u_raw = pid.kp * error + pid.ki * integral + pid.kd * derivative;
+    const u = Math.max(-1000, Math.min(1000, u_raw)); // clamp control signal
+    prevError = error;
+
+    // Plant dynamics (Euler integration)
+    if (plant.type === 'first') {
+      // G(s) = K / (tau*s + 1)  =>  tau * dy/dt + y = K * u
+      const dydt = (plant.K * u - y) / plant.tau;
+      y += dydt * dt;
+    } else {
+      // G(s) = wn^2 / (s^2 + 2*zeta*wn*s + wn^2)
+      // State space: x1' = x2, x2' = -wn^2*x1 - 2*zeta*wn*x2 + wn^2*u
+      const wn = plant.wn;
+      const z = plant.zeta;
+      const dx1 = x2;
+      const dx2 = -wn * wn * x1 - 2 * z * wn * x2 + wn * wn * u;
+      x1 += dx1 * dt;
+      x2 += dx2 * dt;
+      y = x1;
+    }
+
+    // Sample every few steps to keep chart performant
+    if (i % Math.max(1, Math.floor(steps / 1500)) === 0 || i === steps) {
+      data.push({ t: Math.round(t * 1000) / 1000, output: Math.round(y * 10000) / 10000, setpoint, error: Math.round(error * 10000) / 10000 });
+    }
+  }
+  return data;
+}
+
+/* ───── Metrics Calculator ───── */
+function calcMetrics(data, setpoint = 1.0) {
+  if (data.length < 2) return { riseTime: '-', overshoot: '-', settlingTime: '-', ssError: '-' };
+
+  const finalVal = data[data.length - 1].output;
+  const ssError = Math.abs(setpoint - finalVal);
+
+  // Rise time: 10% to 90% of setpoint
+  let t10 = null, t90 = null;
+  for (const pt of data) {
+    if (t10 === null && pt.output >= 0.1 * setpoint) t10 = pt.t;
+    if (t90 === null && pt.output >= 0.9 * setpoint) t90 = pt.t;
+  }
+  const riseTime = (t10 !== null && t90 !== null) ? t90 - t10 : null;
+
+  // Overshoot
+  const peak = Math.max(...data.map(d => d.output));
+  const overshoot = peak > setpoint ? ((peak - setpoint) / setpoint) * 100 : 0;
+
+  // Settling time: last time output leaves ±2% band
+  const band = 0.02 * setpoint;
+  let settlingTime = null;
+  for (let i = data.length - 1; i >= 0; i--) {
+    if (Math.abs(data[i].output - setpoint) > band) {
+      settlingTime = data[i].t;
+      break;
+    }
+  }
+
+  return {
+    riseTime: riseTime !== null ? riseTime.toFixed(3) : 'N/A',
+    overshoot: overshoot.toFixed(1),
+    settlingTime: settlingTime !== null ? settlingTime.toFixed(3) : (data[0].output === setpoint ? 'N/A' : '0.000'),
+    ssError: ssError.toFixed(4),
+  };
+}
+
+/* ───── Ziegler-Nichols Auto-Tune ───── */
+function autoTune(plant) {
+  if (plant.type === 'first') {
+    // Cohen-Coon / ZN approximation for first-order + delay
+    // Approximate delay as fraction of tau
+    const K = plant.K;
+    const tau = plant.tau;
+    const L = tau * 0.1; // approximate small dead time
+    const T = tau;
+    // ZN open-loop: Kp = 1.2*T/(K*L), Ti = 2*L, Td = 0.5*L
+    const kp = Math.max(0.1, 1.2 * T / (K * Math.max(L, 0.01)));
+    const ki = Math.max(0, kp / (2 * Math.max(L, 0.05)));
+    const kd = Math.max(0, kp * 0.5 * Math.max(L, 0.01));
+    return { kp: Math.min(kp, 50), ki: Math.min(ki, 50), kd: Math.min(kd, 20) };
+  } else {
+    // For second-order, use ultimate gain method approximation
+    const wn = plant.wn;
+    const z = plant.zeta;
+    // Ultimate gain Ku at stability boundary
+    // For G(s)=wn^2/(s^2+2*z*wn*s+wn^2), with P controller,
+    // closed-loop char eq: s^2+2*z*wn*s+wn^2*(1+Ku)=0
+    // Marginal stability: use Ku = 4*z/wn (heuristic) adjusted for good response
+    const Ku = Math.max(0.5, (4 * z * wn + 2) / (wn > 0 ? wn : 1));
+    const Tu = (2 * Math.PI) / (wn * Math.sqrt(Math.max(0.01, 1 - z * z)));
+    // ZN closed-loop: Kp=0.6*Ku, Ki=Kp/(0.5*Tu), Kd=Kp*0.125*Tu
+    const kp = 0.6 * Ku;
+    const ki = kp / (0.5 * Tu);
+    const kd = kp * 0.125 * Tu;
+    return { kp: Math.min(Math.max(kp, 0.1), 50), ki: Math.min(Math.max(ki, 0), 50), kd: Math.min(Math.max(kd, 0), 20) };
+  }
+}
+
+/* ───── App Component ───── */
+function App() {
+  const [plantType, setPlantType] = useState('first');
+  const [K, setK] = useState(1.0);
+  const [tau, setTau] = useState(1.0);
+  const [wn, setWn] = useState(5.0);
+  const [zeta, setZeta] = useState(0.5);
+  const [kp, setKp] = useState(2.0);
+  const [ki, setKi] = useState(1.0);
+  const [kd, setKd] = useState(0.5);
+  const [dt] = useState(0.005);
+  const [duration] = useState(15);
+
+  const plant = useMemo(() => (
+    plantType === 'first'
+      ? { type: 'first', K, tau }
+      : { type: 'second', wn, zeta }
+  ), [plantType, K, tau, wn, zeta]);
+
+  const pid = useMemo(() => ({ kp, ki, kd }), [kp, ki, kd]);
+
+  const data = useMemo(() => simulate(plant, pid, 1.0, duration, dt), [plant, pid, duration, dt]);
+  const metrics = useMemo(() => calcMetrics(data, 1.0), [data]);
+
+  const handleAutoTune = useCallback(() => {
+    const tuned = autoTune(plant);
+    setKp(Math.round(tuned.kp * 1000) / 1000);
+    setKi(Math.round(tuned.ki * 1000) / 1000);
+    setKd(Math.round(tuned.kd * 1000) / 1000);
+  }, [plant]);
+
+  const formatTick = (v) => v.toFixed(1);
+
+  return (
+    <div>
+      <div className="header">
+        <h1>PID Controller Simulator</h1>
+        <p>Interactive control system simulator with auto-tuning &bull; Ziegler-Nichols method</p>
+      </div>
+      <div className="layout">
+        {/* Sidebar */}
+        <div className="sidebar">
+          {/* Plant Selection */}
+          <div className="card">
+            <div className="card-title">Plant Selection</div>
+            <div className="btn-group">
+              <button className={plantType === 'first' ? 'active' : ''} onClick={() => setPlantType('first')}>1st Order</button>
+              <button className={plantType === 'second' ? 'active' : ''} onClick={() => setPlantType('second')}>2nd Order</button>
+            </div>
+
+            <div className="transfer-fn">
+              {plantType === 'first' ? (
+                <span>G(s) = <span className="tf-frac"><span className="tf-num">{K.toFixed(1)}</span><span>{tau.toFixed(1)}s + 1</span></span></span>
+              ) : (
+                <span>G(s) = <span className="tf-frac"><span className="tf-num">{(wn*wn).toFixed(1)}</span><span>s² + {(2*zeta*wn).toFixed(1)}s + {(wn*wn).toFixed(1)}</span></span></span>
+              )}
+            </div>
+
+            {plantType === 'first' ? (
+              <>
+                <div className="form-group">
+                  <div className="form-label"><span>Gain <span className="eq-label">K</span></span> <span className="form-value">{K.toFixed(2)}</span></div>
+                  <input type="range" className="cyan-thumb" min="0.1" max="10" step="0.1" value={K} onChange={e => setK(+e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <div className="form-label"><span>Time Constant <span className="eq-label">τ</span></span> <span className="form-value">{tau.toFixed(2)} s</span></div>
+                  <input type="range" className="purple-thumb" min="0.1" max="5" step="0.1" value={tau} onChange={e => setTau(+e.target.value)} />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="form-group">
+                  <div className="form-label"><span>Natural Freq <span className="eq-label">ωn</span></span> <span className="form-value">{wn.toFixed(1)} rad/s</span></div>
+                  <input type="range" className="cyan-thumb" min="0.5" max="20" step="0.5" value={wn} onChange={e => setWn(+e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <div className="form-label"><span>Damping Ratio <span className="eq-label">ζ</span></span> <span className="form-value">{zeta.toFixed(2)}</span></div>
+                  <input type="range" className="purple-thumb" min="0.05" max="2" step="0.05" value={zeta} onChange={e => setZeta(+e.target.value)} />
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* PID Controls */}
+          <div className="card">
+            <div className="card-title">PID Controller</div>
+            <div className="form-group">
+              <div className="form-label"><span>Proportional <span className="eq-label">Kp</span></span> <span className="form-value">{kp.toFixed(3)}</span></div>
+              <input type="range" className="green-thumb" min="0" max="50" step="0.1" value={kp} onChange={e => setKp(+e.target.value)} />
+            </div>
+            <div className="form-group">
+              <div className="form-label"><span>Integral <span className="eq-label">Ki</span></span> <span className="form-value">{ki.toFixed(3)}</span></div>
+              <input type="range" className="orange-thumb" min="0" max="50" step="0.1" value={ki} onChange={e => setKi(+e.target.value)} />
+            </div>
+            <div className="form-group">
+              <div className="form-label"><span>Derivative <span className="eq-label">Kd</span></span> <span className="form-value">{kd.toFixed(3)}</span></div>
+              <input type="range" className="red-thumb" min="0" max="20" step="0.05" value={kd} onChange={e => setKd(+e.target.value)} />
+            </div>
+            <div className="separator"></div>
+            <button className="auto-tune-btn" onClick={handleAutoTune}>⚡ Auto-Tune (Ziegler-Nichols)</button>
+          </div>
+
+          {/* Simulation Settings */}
+          <div className="card">
+            <div className="card-title">Simulation</div>
+            <div className="form-label"><span>Time Step</span> <span className="form-value">{dt} s</span></div>
+            <div className="form-label" style={{marginTop: 6}}><span>Duration</span> <span className="form-value">{duration} s</span></div>
+            <div className="form-label" style={{marginTop: 6}}><span>Data Points</span> <span className="form-value">{data.length}</span></div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="main">
+          {/* Chart */}
+          <div className="chart-wrapper" style={{marginBottom: 16}}>
+            <div className="card-title" style={{marginBottom: 12}}>Step Response</div>
+            <ResponsiveContainer width="100%" height={420}>
+              <LineChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis
+                  dataKey="t"
+                  stroke="#64748b"
+                  tick={{ fontSize: 12 }}
+                  tickFormatter={formatTick}
+                  label={{ value: 'Time (s)', position: 'insideBottomRight', offset: -5, fill: '#64748b', fontSize: 12 }}
+                />
+                <YAxis
+                  stroke="#64748b"
+                  tick={{ fontSize: 12 }}
+                  label={{ value: 'Amplitude', angle: -90, position: 'insideLeft', fill: '#64748b', fontSize: 12 }}
+                />
+                <Tooltip
+                  contentStyle={{ background: '#1e293b', border: '1px solid #475569', borderRadius: 8, fontSize: 13 }}
+                  labelStyle={{ color: '#94a3b8' }}
+                  labelFormatter={(v) => `t = ${v} s`}
+                />
+                <Legend verticalAlign="top" height={36} />
+                <ReferenceLine y={1} stroke="#475569" strokeDasharray="6 3" label="" />
+                <Line type="monotone" dataKey="setpoint" stroke="#f59e0b" strokeWidth={2} strokeDasharray="8 4" dot={false} name="Setpoint" />
+                <Line type="monotone" dataKey="output" stroke="#3b82f6" strokeWidth={2.5} dot={false} name="Plant Output" isAnimationActive={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Metrics */}
+          <div className="card">
+            <div className="card-title">Performance Metrics</div>
+            <div className="metrics-grid">
+              <div className="metric-card">
+                <div className="metric-label">Rise Time (10-90%)</div>
+                <div className="metric-value mv-blue">{metrics.riseTime}<span className="metric-unit">s</span></div>
+              </div>
+              <div className="metric-card">
+                <div className="metric-label">Overshoot</div>
+                <div className="metric-value mv-orange">{metrics.overshoot}<span className="metric-unit">%</span></div>
+              </div>
+              <div className="metric-card">
+                <div className="metric-label">Settling Time (2%)</div>
+                <div className="metric-value mv-green">{metrics.settlingTime}<span className="metric-unit">s</span></div>
+              </div>
+              <div className="metric-card">
+                <div className="metric-label">Steady-State Error</div>
+                <div className="metric-value mv-red">{metrics.ssError}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Error Chart */}
+          <div className="chart-wrapper" style={{marginTop: 16}}>
+            <div className="card-title" style={{marginBottom: 12}}>Error Signal</div>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="t" stroke="#64748b" tick={{ fontSize: 11 }} tickFormatter={formatTick} />
+                <YAxis stroke="#64748b" tick={{ fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={{ background: '#1e293b', border: '1px solid #475569', borderRadius: 8, fontSize: 13 }}
+                  labelFormatter={(v) => `t = ${v} s`}
+                />
+                <ReferenceLine y={0} stroke="#475569" />
+                <Line type="monotone" dataKey="error" stroke="#ef4444" strokeWidth={2} dot={false} name="Error" isAnimationActive={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
